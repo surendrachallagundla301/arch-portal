@@ -1,0 +1,65 @@
+name: arch-portal
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: archportal
+      POSTGRES_USER: archportal
+      POSTGRES_PASSWORD: archportal
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U archportal -d archportal"]
+      interval: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak/arch-portal-realm.json:/opt/keycloak/data/import/arch-portal-realm.json:ro
+    ports:
+      - "8080:8080"
+
+  cmdb:
+    # Stand-in for the enterprise CMDB so the API's integration and retry logic can be exercised locally.
+    image: wiremock/wiremock:3.9.1
+    volumes:
+      - ./cmdb-mock/mappings:/home/wiremock/mappings:ro
+    ports:
+      - "9090:8080"
+
+  api:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/archportal
+      DB_USER: archportal
+      DB_PASSWORD: archportal
+      # Tokens are issued to the browser via localhost:8080, keys are fetched over the compose network.
+      KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/arch-portal
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/arch-portal/protocol/openid-connect/certs
+      CMDB_BASE_URL: http://cmdb:8080
+      CORS_ALLOWED_ORIGINS: http://localhost:4200
+    ports:
+      - "8081:8081"
+
+  web:
+    build: ./frontend
+    depends_on: [api]
+    volumes:
+      - ./frontend/public/config.json:/usr/share/nginx/html/config.json:ro
+    ports:
+      - "4200:8080"
+
+volumes:
+  pgdata:

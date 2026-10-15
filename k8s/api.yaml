@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arch-portal-api
+  namespace: arch-portal
+  labels: { app: arch-portal-api }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: arch-portal-api }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: arch-portal-api }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: api
+          image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/arch-portal-api:1.0.0
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef: { name: arch-portal-api-config }
+            - secretRef: { name: arch-portal-api-secrets }
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 768Mi }
+          # Spring Boot Actuator probe endpoints (management.endpoint.health.probes.enabled=true)
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8081 }
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8081 }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8081 }
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arch-portal-api
+  namespace: arch-portal
+spec:
+  selector: { app: arch-portal-api }
+  ports:
+    - port: 80
+      targetPort: 8081

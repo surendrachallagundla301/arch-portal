@@ -1,0 +1,25 @@
+{
+  "mappings": [
+    {
+      "request": { "method": "GET", "url": "/applications/billing-service" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "name": "billing-service", "owner": "Payments Team", "criticality": "HIGH" }
+      }
+    },
+    {
+      "request": { "method": "GET", "url": "/applications/claims-api" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "name": "claims-api", "owner": "Claims Platform", "criticality": "MEDIUM" }
+      }
+    },
+    {
+      "priority": 10,
+      "request": { "method": "GET", "urlPattern": "/applications/.*" },
+      "response": { "status": 404 }
+    }
+  ]
+}

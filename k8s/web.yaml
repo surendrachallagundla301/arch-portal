@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arch-portal-web
+  namespace: arch-portal
+  labels: { app: arch-portal-web }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: arch-portal-web }
+  template:
+    metadata:
+      labels: { app: arch-portal-web }
+    spec:
+      containers:
+        - name: web
+          image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/arch-portal-web:1.0.0
+          ports:
+            - containerPort: 8080
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          volumeMounts:
+            # Replace only config.json inside the built site, using subPath.
+            - name: runtime-config
+              mountPath: /usr/share/nginx/html/config.json
+              subPath: config.json
+              readOnly: true
+      volumes:
+        - name: runtime-config
+          configMap:
+            name: arch-portal-web-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arch-portal-web
+  namespace: arch-portal
+spec:
+  selector: { app: arch-portal-web }
+  ports:
+    - port: 80
+      targetPort: 8080
